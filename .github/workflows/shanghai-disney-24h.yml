@@ -1,0 +1,51 @@
+name: Shanghai Disney 24h queue sync test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/shanghai-disney-24h.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: shanghai-disney-24h-sample
+  cancel-in-progress: false
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Check configured 24-hour window
+        id: window
+        run: python3 monitor.py --gate
+
+      - name: Retrieve and compare Shanghai Disneyland wait times
+        if: steps.window.outputs.active == 'true'
+        run: python3 monitor.py
+
+      - name: Save raw API data and comparison report
+        if: always() && steps.window.outputs.active == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: shanghai-disney-sample-${{ github.run_id }}
+          path: probe-output/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Automatically stop monitoring after window closes
+        if: steps.window.outputs.expired == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/shanghai-disney-24h.yml/disable"
+          echo "The 24-hour window has closed. Scheduled workflow disabled." >> "$GITHUB_STEP_SUMMARY"
