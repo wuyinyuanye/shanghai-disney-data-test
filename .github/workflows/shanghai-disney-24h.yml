@@ -1,4 +1,4 @@
-name: Shanghai Disney 24h queue sync test
+name: Shanghai Disney 2-day daytime queue sync test
 
 on:
   push:
@@ -7,14 +7,22 @@ on:
       - '.github/workflows/shanghai-disney-24h.yml'
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    # GitHub cron is UTC; Shanghai time is UTC+8.
+    # Nov 11 & 12, 08:30-08:55 China time
+    - cron: '30-59/5 0 11,12 11 *'
+    # Nov 11 & 12, 09:00-20:55 China time
+    - cron: '*/5 1-12 11,12 11 *'
+    # Nov 11 & 12, 21:00-21:25 China time
+    - cron: '0-25/5 13 11,12 11 *'
+    # Nov 12, 21:35 China time: shutdown check only, no API requests
+    - cron: '35 13 12 11 *'
 
 permissions:
   contents: read
   actions: write
 
 concurrency:
-  group: shanghai-disney-24h-sample
+  group: shanghai-disney-2-day-daytime-sample
   cancel-in-progress: false
 
 jobs:
@@ -25,7 +33,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Check configured 24-hour window
+      - name: Check two park-day sampling windows
         id: window
         run: python3 monitor.py --gate
 
@@ -48,4 +56,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/shanghai-disney-24h.yml/disable"
-          echo "The 24-hour window has closed. Scheduled workflow disabled." >> "$GITHUB_STEP_SUMMARY"
+          echo "Both operating-day windows have closed. Scheduled workflow disabled." >> "$GITHUB_STEP_SUMMARY"
