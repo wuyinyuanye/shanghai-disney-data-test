@@ -1,37 +1,41 @@
-# Shanghai Disneyland 排队数据 24 小时测试
+# 上海迪士尼 · 两个完整运营日排队数据测试
 
-本仓库用于**独立云端采样**，不依赖用户的 Mac 网络，也不是微信小程序。
+这是独立运行的 GitHub Actions 数据采集实验，不依赖用户的 Mac，**未开发微信小程序**。
 
-## 测试窗口
+## 运行时间（上海当地时间 UTC+8）
 
-- 开始：2026-11-10 12:05 中国标准时间（UTC+8）
-- 结束：2026-11-11 12:05 中国标准时间（UTC+8）
-- 计划频率：每 5 分钟执行一次（GitHub Actions 定时调度存在延迟或漏跑，不保证精确执行 288 次）
-- 测试范围：**仅上海迪士尼**，ThemeParks.wiki + Queue-Times 两家第三方
-- 每次检查独立保存 2 份原始 JSON 与 1 份对照报告，GitHub Actions Artifacts 保留 7 天
-- 到期后工作流将停止请求数据，并尝试用 GitHub Actions 授权令牌自动禁用自身。即使禁用失败，脚本的时间窗口保护仍会阻止继续调用上游 API
+| 日期 | 开始 | 预计闭园 | 计划运行 |
+| --- | --- | --- | --- |
+| 2026-11-11（周三） | 08:30 | 21:30 | 13 小时 |
+| 2026-11-12（周四） | 08:30 | 21:30 | 13 小时 |
 
-## 测试的指标
+合计 **26 个运营小时**，每 5 分钟计划采样一次，理论上约 312 个采样时段；GitHub Actions 的 `schedule` 会延误或漏跑，按真实样本评估。
+闭园后至次日开园前不会请求排队 API。预计闭园时间按当前公开的运营日历，若官方变更，须同步修改 `config.json` 和 workflow 定时窗口。
 
-1. **接口可用性**：两个 API 各自的成功次数、失败类型、HTTP 状态、请求耗时
-2. **数据一致性**：同一轮里匹配到的项目数量、开闭状态是否一致、排队分钟数完全一致的比例
-3. **时间覆盖与同步变化**：通过对比连续采样文件分析等待分钟数的变化、潜在的采集空窗和落后于另一个数据源的情况
-4. **对照局限**：**两个第三方一致，不等于与迪士尼官方 App 一致。** 若需要检验官方同步延迟，必须在同一时间获取并记录官方 App 的显示数据
+累计采集时间参考检查点：
+- **12 小时**：11 月 11 日 20:30
+- **24 小时**：11 月 12 日 19:30
+- **全部 26 小时**：11 月 12 日 21:30
 
-不要把 ThemeParks.wiki 的单项目 `lastUpdated` 与 Queue-Times 的 `last_updated` 当作意义完全相同的时间；保存它们是为后续分析，不能直接按时间差判定某一方不准确。
+到第二天闭园后，工作流会在 21:35 左右执行到期检查并尝试自动禁用；即便 GitHub 漏掉停止运行，脚本本身也禁止窗口外请求上游接口。
+
+## 检查项目
+
+- ThemeParks.wiki 和 Queue-Times 两个第三方源是否成功响应、各自的 HTTP 状态/耗时
+- 同一轮两家源匹配的项目数、开放状态一致性、排队数字一致性
+- 重点设施的数字变化、接口中断或数据覆盖不足现象
+- **不能证明和上海迪士尼官方 App 完全一致**：本实验没有取得官方 App 的同时段原始读数
 
 ## 查看结果
 
-- [GitHub Actions 运行历史](https://github.com/wuyinyuanye/shanghai-disney-data-test/actions/workflows/shanghai-disney-24h.yml)
-- 打开任一运行记录，在 **Summary** 查看本次结果，在 **Artifacts** 下载 `shanghai-disney-sample-<run_id>` 压缩包
-- 压缩包：`themeparks_raw.json`、`queue_times_raw.json`、`report.json`，若某个接口失败，其原始文件可能缺失，但错误仍记在 `report.json`
+- [GitHub Actions 运行列表](https://github.com/wuyinyuanye/shanghai-disney-data-test/actions/workflows/shanghai-disney-24h.yml)
+- 每个真实采样任务在 Artifacts 保存 `shanghai-disney-sample-<run_id>`：`themeparks_raw.json`、`queue_times_raw.json`、`report.json`
+- 日志和 Artifacts 仅保留 GitHub 规定的时长（本项目设置 7 天），建议到期前集中分析或下载。**当前尚未建立独立的跨采样汇总数据库。**
 
-## 文件
+## 配置
 
-- `monitor.py`：标准库 Python 采集与逐项比对、失败重试及时间窗口控制
-- `config.json`：固定的采样开始/结束时间
-- `.github/workflows/shanghai-disney-24h.yml`：每 5 分钟云端采样、归档和到期自动停用
+- `config.json`：指定测试日期、上海本地营业时段、12h / 24h / 26h 检查点
+- `monitor.py`：标准 Python 脚本；`--gate` 会判定本次是否属于营业窗口，采样本身也检查窗口
+- `.github/workflows/shanghai-disney-24h.yml`：仅在 11 月 11、12 日营业时段调度采样；结束后尝试自动停用工作流
 
-## 限制
-
-正式商用前，需要核查第三方的商业使用条款和数据源稳定性。本仓库不能证明迪士尼对第三方上游接口的授权，也没有验证官方 App 与第三方的同屏一致性。
+正式商用前，需要确认第三方数据的授权条件，且与官方 App 实际显示进行同步对照。第三方之间完全一致并不等于官方一致。
