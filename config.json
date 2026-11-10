@@ -1,0 +1,9 @@
+{
+  "park_name": "Shanghai Disneyland",
+  "park_id": "ddc4357c-c148-4b36-9888-07894fe75e83",
+  "queue_times_park_id": 30,
+  "start_utc": "2026-11-10T04:05:00Z",
+  "end_utc": "2026-11-11T04:05:00Z",
+  "interval_target_minutes": 5,
+  "note": "24-hour experiment; scheduled execution can be delayed or skipped by GitHub."
+}
