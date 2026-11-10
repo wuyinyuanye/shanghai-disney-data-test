@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""24h Shanghai Disneyland API consistency monitor, Python standard library only.
+"""Two-day, park-hours Shanghai Disneyland API consistency monitor, stdlib only.
 
 IMPORTANT: compares two third-party published queue values, NOT Disney's official app.
 Saves independent raw responses, retrieval times, queue state, and same-sample matches.
@@ -15,6 +15,7 @@ import socket
 import sys
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from urllib import error, request
 
@@ -49,26 +50,47 @@ def parse_time(value):
 
 def load_config():
     value = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    start, end = parse_time(value["start_utc"]), parse_time(value["end_utc"])
-    if not start or not end or not start < end:
-        raise ValueError("Invalid start/end UTC window")
-    return value, start, end
+    zone = ZoneInfo(value["timezone"])
+    ranges = []
+    for item in value["test_days"]:
+        day = item["date"]
+        start = datetime.fromisoformat(f"{day}T{item['open']}:00").replace(tzinfo=zone).astimezone(timezone.utc)
+        end = datetime.fromisoformat(f"{day}T{item['close']}:00").replace(tzinfo=zone).astimezone(timezone.utc)
+        if end <= start:
+            raise ValueError(f"Invalid opening and closing: {item}")
+        ranges.append((start, end))
+    if len(ranges) != 2 or ranges != sorted(ranges):
+        raise ValueError("Exactly two chronological operating days required")
+    if ranges[0][1] >= ranges[1][0]:
+        raise ValueError("Overlapping operating windows")
+    return value, ranges
+
+
+def get_window_state(moment=None):
+    config, ranges = load_config()
+    moment = moment or now()
+    active = any(start <= moment < end for start, end in ranges)
+    expired = moment >= ranges[-1][1]
+    return config, ranges, active, expired
 
 
 def gate():
-    config, start, end = load_config()
+    config, ranges, active, expired = get_window_state()
     moment = now()
-    active = start <= moment < end
-    expired = moment >= end
-    outputs = {"active": str(active).lower(),
-               "expired": str(expired).lower(),
-               "now_utc": fmt(moment)}
+    outputs = {
+        "active": str(active).lower(),
+        "expired": str(expired).lower(),
+        "now_utc": fmt(moment),
+    }
     if os.getenv("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fp:
             for key, val in outputs.items():
                 fp.write(f"{key}={val}\n")
-    print(json.dumps({"window_start": fmt(start), "window_end": fmt(end),
-                      **outputs}, ensure_ascii=False))
+    print(json.dumps({
+        "park_time_zone": config["timezone"],
+        "daytime_sessions_utc": [{"start": fmt(a), "end": fmt(b)} for a, b in ranges],
+        **outputs,
+    }, ensure_ascii=False))
     return 0
 
 
@@ -171,7 +193,7 @@ def summary(report):
         return
     stats = report.get("comparison") or {}
     lines = [
-        "## Shanghai Disneyland 24-hour test",
+        "## Shanghai Disneyland two-day daytime test",
         f"- Time (UTC): {report['checked_at_utc']}",
         f"- ThemeParks.wiki: {report['sources'].get('themeparks', {}).get('ok', False)}",
         f"- Queue-Times: {report['sources'].get('queue_times', {}).get('ok', False)}",
@@ -187,11 +209,20 @@ def summary(report):
 
 def run():
     OUT.mkdir(parents=True, exist_ok=True)
-    cfg, start, end = load_config()
+    cfg, ranges, active, expired = get_window_state()
     checked = now()
+    if not active:
+        print(json.dumps({
+            "skipped": "outside Shanghai Disneyland operating hours",
+            "checked_at_utc": fmt(checked),
+            "expired": expired,
+        }, ensure_ascii=False))
+        return 0
     report = {
-        "checked_at_utc": fmt(checked), "window_start_utc": fmt(start),
-        "window_end_utc": fmt(end), "park_name": cfg["park_name"],
+        "checked_at_utc": fmt(checked),
+        "window_start_utc": fmt(ranges[0][0]),
+        "window_end_utc": fmt(ranges[-1][1]),
+        "park_name": cfg["park_name"],
         "sources": {}, "comparison": None,
         "official_app_comparison": "NOT_PERFORMED",
     }
