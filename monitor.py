@@ -3,7 +3,7 @@
 
 IMPORTANT: compares two third-party published queue values, NOT Disney's official app.
 Saves independent raw responses, retrieval times, queue state, and same-sample matches.
-One invocation = one sample; GitHub Actions manages the cadence.
+One invocation = one sample; continuous.py manages the cadence within each cloud runner.
 """
 from __future__ import annotations
 
@@ -59,9 +59,9 @@ def load_config():
         if end <= start:
             raise ValueError(f"Invalid opening and closing: {item}")
         ranges.append((start, end))
-    if len(ranges) != 2 or ranges != sorted(ranges):
-        raise ValueError("Exactly two chronological operating days required")
-    if ranges[0][1] >= ranges[1][0]:
+    if not ranges or ranges != sorted(ranges):
+        raise ValueError("At least one chronological operating day required")
+    if any(a[1] >= b[0] for a, b in zip(ranges, ranges[1:])):
         raise ValueError("Overlapping operating windows")
     return value, ranges
 
