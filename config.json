@@ -5,30 +5,38 @@
   "timezone": "Asia/Shanghai",
   "test_days": [
     {
-      "date": "2026-11-11",
-      "open": "08:30",
-      "close": "21:30"
-    },
-    {
       "date": "2026-11-12",
       "open": "08:30",
-      "close": "21:30"
+      "close": "21:30",
+      "purpose": "recovery"
+    },
+    {
+      "date": "2026-11-13",
+      "open": "08:30",
+      "close": "21:30",
+      "purpose": "acceptance_day_1"
+    },
+    {
+      "date": "2026-11-14",
+      "open": "08:30",
+      "close": "21:30",
+      "purpose": "acceptance_day_2"
     }
   ],
   "interval_target_minutes": 5,
   "checkpoints": [
     {
       "label": "day1_12h",
-      "at_local": "2026-11-11T20:30:00+08:00"
+      "at_local": "2026-11-13T20:30:00+08:00"
     },
     {
       "label": "day2_24h",
-      "at_local": "2026-11-12T19:30:00+08:00"
+      "at_local": "2026-11-14T19:30:00+08:00"
     },
     {
       "label": "final_26h",
-      "at_local": "2026-11-12T21:30:00+08:00"
+      "at_local": "2026-11-14T21:30:00+08:00"
     }
   ],
-  "note": "Two full park days, 08:30-21:30 CST, based on currently posted hours; when park publishes new closing hours update the config. GitHub scheduled workflow is best-effort."
+  "note": "2026-11-12 recovery only; 2026-11-13 and 14 are the new two full acceptance days. Shanghai local time. Python polls every five minutes within three segments of at most 4.5 hours. GitHub starts the daily chain; scheduled starts are still best-effort."
 }
